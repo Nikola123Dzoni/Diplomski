@@ -31,6 +31,9 @@ def create_account(
 
     return new_account
 
+@app.get("/accounts", response_model=list[schemas.AccountResponse])
+def get_accounts(db: Session = Depends(get_db)):
+    return db.query(models.Account).all()
 
 @app.get("/accounts/{account_id}", response_model=schemas.AccountResponse)
 def get_account(
