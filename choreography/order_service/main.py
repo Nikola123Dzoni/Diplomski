@@ -35,6 +35,7 @@ def create_order(
     new_order = models.Order(
         saga_id=order.saga_id,
         product_id=order.product_id,
+        account_id=order.account_id,
         quantity=order.quantity,
         price=order.price,
         status="PENDING"
@@ -64,6 +65,7 @@ def create_order(
         "saga_id": new_order.saga_id,
         "order_id": new_order.id,
         "product_id": new_order.product_id,
+        "account_id": new_order.account_id,
         "quantity": new_order.quantity,
         "amount": new_order.price
     })

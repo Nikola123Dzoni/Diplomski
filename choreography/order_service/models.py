@@ -8,6 +8,7 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     saga_id = Column(Integer, unique=True, nullable=False)
     product_id = Column(Integer, nullable=False)
+    account_id = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False)
     status = Column(String, default="PENDING")

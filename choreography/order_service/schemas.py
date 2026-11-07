@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class OrderCreate(BaseModel):
     saga_id: int
     product_id: int
+    account_id: int
     quantity: int
     price: float
 
@@ -16,6 +17,7 @@ class OrderResponse(BaseModel):
     id: int
     saga_id: int
     product_id: int
+    account_id: int
     quantity: int
     price: float
     status: str
