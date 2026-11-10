@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db
-from . import models, schemas
+from . import models, schemas, service
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -58,57 +58,7 @@ def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
 ):
-    # Zakljucavamo racun
-    account = (
-        db.query(models.Account)
-        .filter(models.Account.id == payment.account_id)
-        .with_for_update()
-        .first()
-    )
-
-    if account is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Account not found"
-        )
-
-    # Proveravamo da li je Saga vec izvrsila placanje
-    existing_payment = db.query(models.Payment).filter(
-        models.Payment.saga_id == payment.saga_id
-    ).first()
-
-    if existing_payment:
-        if existing_payment.status == "REFUNDED":
-            raise HTTPException(
-                status_code=409,
-                detail="Payment already refunded"
-            )
-
-        return existing_payment
-
-    if account.balance < payment.amount:
-        raise HTTPException(
-            status_code=400,
-            detail="Insufficient funds"
-        )
-
-    # Skidamo novac
-    account.balance -= payment.amount
-
-    # Kreiramo zapis o placanju
-    new_payment = models.Payment(
-        saga_id=payment.saga_id,
-        order_id=payment.order_id,
-        account_id=payment.account_id,
-        amount=payment.amount,
-        status="COMPLETED"
-    )
-
-    db.add(new_payment)
-    db.commit()
-    db.refresh(new_payment)
-
-    return new_payment
+    return service.pay(db, payment)
 
 
 @app.get("/payments", response_model=list[schemas.PaymentResponse])

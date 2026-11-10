@@ -2,7 +2,7 @@
 import json
 import pika
 
-from .rabbitmq import setup_queue, RABBITMQ_HOST, QUEUE_NAME
+from .rabbitmq import setup_queue, RABBITMQ_HOST, QUEUE_NAME, publish_event
 from .database import SessionLocal
 from . import service, schemas
 
@@ -27,8 +27,19 @@ def process_message(ch, method, properties, body):
 
         print("Rezervacija uspesna:", result)
 
-        # Sledeci korak:
-        # Objaviti InventoryReserved
+        # Objavljujemo novi dogadjaj
+        publish_event(
+            "InventoryReserved",
+            {
+                "saga_id": event["saga_id"],
+                "order_id": event["order_id"],
+                "product_id": event["product_id"],
+                "account_id": event["account_id"],
+                "quantity": event["quantity"],
+                "amount": event["amount"]
+            }
+        )
+        print("InventoryReserved poslat u RabbitMQ!", flush=True)
 
     except Exception:
         db.rollback()
