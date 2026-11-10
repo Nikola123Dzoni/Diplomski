@@ -3,14 +3,42 @@ import json
 import pika
 
 from .rabbitmq import setup_queue, RABBITMQ_HOST, QUEUE_NAME
+from .database import SessionLocal
+from . import service, schemas
 
 
 def process_message(ch, method, properties, body):
     event = json.loads(body)
 
-    print("Primljen dogadjaj:", event, flush=True)
+    if event["event_type"] != "OrderCreated":
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        return
 
-    # Za sada samo potvrdjujemo prijem poruke
+    db = SessionLocal()
+
+    try:
+        request = schemas.ReserveRequest(
+            saga_id=event["saga_id"],
+            product_id=event["product_id"],
+            quantity=event["quantity"]
+        )
+
+        result = service.reserve_product(db, request)
+
+        print("Rezervacija uspesna:", result)
+
+        # Sledeci korak:
+        # Objaviti InventoryReserved
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
+
+    # Privremeno: kasnije ACK tek nakon
+    # pouzdanog objavljivanja InventoryReserved
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
