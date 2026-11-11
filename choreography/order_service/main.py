@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from .database import engine, get_db
-from . import models, schemas
+from . import models, schemas, service
 from .rabbitmq import publish_event
 
 
@@ -67,7 +67,7 @@ def create_order(
         "product_id": new_order.product_id,
         "account_id": new_order.account_id,
         "quantity": new_order.quantity,
-        "amount": new_order.price
+        "amount": new_order.price * new_order.quantity
     })
 
     return new_order
@@ -87,44 +87,11 @@ def update_order_status(
     order_update: schemas.OrderUpdate,
     db: Session = Depends(get_db)
 ):
-    # Zakljuvamo order dok se menja njegov status
-    order = (
-        db.query(models.Order)
-        .filter(models.Order.id == order_update.id)
-        .with_for_update()
-        .first()
+    return service.update_order_status(
+        db,
+        order_update.id,
+        order_update.status
     )
-
-    if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Order not found"
-        )
-
-    # Ako je status vec postavljen, operacija je idempotentna
-    if order.status == order_update.status:
-        return order
-
-    # ne moze PAID ako je bio CANCELLED
-    if order.status == "CANCELLED":
-        raise HTTPException(
-            status_code=409,
-            detail="Order already cancelled"
-        )
-
-    # Dozvoljavamo PENDING -> PAID
-    if order.status != "PENDING" or order_update.status != "PAID":
-        raise HTTPException(
-            status_code=409,
-            detail="Invalid order status transition"
-        )
-
-    order.status = "PAID"
-
-    db.commit()
-    db.refresh(order)
-
-    return order
 
 
 @app.post("/cancel", response_model=schemas.OrderResponse)

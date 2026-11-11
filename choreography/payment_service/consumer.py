@@ -35,7 +35,7 @@ def process_message(ch, method, properties, body):
 
         print("Placanje uspesno:", result)
 
-        '''
+
         # Objavljujemo novi dogadjaj
         publish_event(
             "PaymentCompleted",
@@ -49,7 +49,7 @@ def process_message(ch, method, properties, body):
             }
         )
         print("PaymentCompleted objavljen!", flush=True)
-        '''
+
 
     except Exception as e:
         db.rollback()
