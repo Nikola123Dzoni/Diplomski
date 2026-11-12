@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -31,9 +32,11 @@ def create_account(
 
     return new_account
 
+
 @app.get("/accounts", response_model=list[schemas.AccountResponse])
 def get_accounts(db: Session = Depends(get_db)):
     return db.query(models.Account).all()
+
 
 @app.get("/accounts/{account_id}", response_model=schemas.AccountResponse)
 def get_account(
@@ -58,7 +61,29 @@ def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db)
 ):
-    return service.pay(db, payment)
+    try:
+        return service.pay(db, payment)
+
+    except service.AccountNotFoundError:
+        db.rollback()
+        raise HTTPException(
+            status_code=404,
+            detail="Account not found"
+        )
+
+    except service.InsufficientFundsError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient funds"
+        )
+
+    except service.PaymentAlreadyRefundedError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Payment already refunded"
+        )
 
 
 @app.get("/payments", response_model=list[schemas.PaymentResponse])
@@ -119,6 +144,7 @@ def refund_payment(
     db.refresh(payment)
 
     return payment
+
 
 @app.delete("/test-data/account/{account_id}")
 def delete_test_account_data(

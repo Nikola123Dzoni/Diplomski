@@ -30,6 +30,12 @@ def setup_queue():
         routing_key="OrderCreated"
     )
 
+    channel.queue_bind(
+        exchange=EXCHANGE_NAME,
+        queue=QUEUE_NAME,
+        routing_key="PaymentFailed"
+    )
+
     connection.close()
 
 def publish_event(event_type, data):

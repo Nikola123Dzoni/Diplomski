@@ -34,8 +34,45 @@ def process_message(ch, method, properties, body):
 
         finally:
             db.close()
+    elif event["event_type"] == "InventoryReservationFailed":
+        db = SessionLocal()
+
+        try:
+            order = service.cancel_order(
+                db,
+                event["order_id"]
+            )
+
+            print("Order CANCELLED:", order.id)
+
+        except Exception as e:
+            db.rollback()
+            print("Greska pri otkazivanju:", e)
+            raise
+
+        finally:
+            db.close()
+    elif event["event_type"] == "InventoryReleased":
+        db = SessionLocal()
+
+        try:
+            order = service.cancel_order(
+                db,
+                event["order_id"]
+            )
+
+            print("Order CANCELLED:", order.id)
+
+        except Exception as e:
+            db.rollback()
+            print("Greska pri otkazivanju:", e)
+            raise
+
+        finally:
+            db.close()
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 
 def start_consumer():
@@ -57,7 +94,14 @@ def start_consumer():
 
     print("Order Consumer ceka poruke...", flush=True)
 
-    channel.start_consuming()
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        print("Order Consumer zaustavljen.")
+        channel.stop_consuming()
+    finally:
+        if connection.is_open:
+            connection.close()
 
 
 if __name__ == "__main__":

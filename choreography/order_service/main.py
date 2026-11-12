@@ -82,16 +82,33 @@ def get_orders(
     return orders
 
 
+
 @app.put("/orders/status", response_model=schemas.OrderResponse)
 def update_order_status(
     order_update: schemas.OrderUpdate,
     db: Session = Depends(get_db)
 ):
-    return service.update_order_status(
-        db,
-        order_update.id,
-        order_update.status
-    )
+    try:
+        return service.update_order_status(
+            db,
+            order_update.id,
+            order_update.status
+        )
+
+    except service.OrderNotFoundError:
+        db.rollback()
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    except service.InvalidOrderStatusError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Invalid order status transition"
+        )
+
 
 
 @app.post("/cancel", response_model=schemas.OrderResponse)
@@ -99,37 +116,22 @@ def cancel_order(
     request: schemas.CancelOrderRequest,
     db: Session = Depends(get_db)
 ):
-    # Zakljucavamo
-    order = (
-        db.query(models.Order)
-        .filter(models.Order.id == request.order_id)
-        .with_for_update()
-        .first()
-    )
+    try:
+        return service.cancel_order(db, request.order_id)
 
-    if order is None:
+    except service.OrderNotFoundError:
+        db.rollback()
         raise HTTPException(
             status_code=404,
             detail="Order not found"
         )
 
-    # Vec je otkazan -> idempotentna kompenzacija
-    if order.status == "CANCELLED":
-        return order
-
-    # Uspesno placen order vise ne treba otkazivati
-    if order.status == "PAID":
+    except service.InvalidOrderStatusError:
+        db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="Paid order cannot be cancelled"
+            detail="Order cannot be cancelled"
         )
-
-    order.status = "CANCELLED"
-
-    db.commit()
-    db.refresh(order)
-
-    return order
 
 
 @app.delete("/test-data/order/{order_id}")

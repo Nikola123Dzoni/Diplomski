@@ -1,7 +1,15 @@
+
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
 
 from . import models
+
+
+class OrderNotFoundError(Exception):
+    pass
+
+
+class InvalidOrderStatusError(Exception):
+    pass
 
 
 def update_order_status(db: Session, order_id: int, status: str):
@@ -13,28 +21,53 @@ def update_order_status(db: Session, order_id: int, status: str):
     )
 
     if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Order not found"
-        )
+        raise OrderNotFoundError("Order not found")
 
+    # Idempotentnost
     if order.status == status:
-        db.rollback()
+        db.commit()
+        db.refresh(order)
         return order
 
     if order.status == "CANCELLED":
-        raise HTTPException(
-            status_code=409,
-            detail="Order already cancelled"
-        )
+        raise InvalidOrderStatusError("Order already cancelled")
 
     if order.status != "PENDING" or status != "PAID":
-        raise HTTPException(
-            status_code=409,
-            detail="Invalid order status transition"
+        raise InvalidOrderStatusError(
+            "Invalid order status transition"
         )
 
     order.status = "PAID"
+
+    db.commit()
+    db.refresh(order)
+
+    return order
+
+
+def cancel_order(db: Session, order_id: int):
+    order = (
+        db.query(models.Order)
+        .filter(models.Order.id == order_id)
+        .with_for_update()
+        .first()
+    )
+
+    if order is None:
+        raise OrderNotFoundError("Order not found")
+
+    # Idempotentna kompenzacija
+    if order.status == "CANCELLED":
+        db.commit()
+        db.refresh(order)
+        return order
+
+    if order.status != "PENDING":
+        raise InvalidOrderStatusError(
+            "Order cannot be cancelled"
+        )
+
+    order.status = "CANCELLED"
 
     db.commit()
     db.refresh(order)

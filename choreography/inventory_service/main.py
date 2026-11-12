@@ -41,72 +41,59 @@ def get_reservations(db: Session = Depends(get_db)):
     return db.query(models.Reservation).all()
 
 
+
 @app.post("/reserve")
 def reserve_product(
     request: schemas.ReserveRequest,
     db: Session = Depends(get_db)
 ):
-    return service.reserve_product(db, request)
+    try:
+        return service.reserve_product(db, request)
+
+    except service.InsufficientStockError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Not enough products in stock"
+        )
+
+    except service.ProductNotFoundError:
+        db.rollback()
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    except service.ReservationAlreadyReleasedError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Reservation already released"
+        )
+
 
 @app.post("/release")
 def release_product(
     request: schemas.ReleaseRequest,
     db: Session = Depends(get_db)
 ):
-    # Treba da pronadjemo rezervaciju preko saga_id
-    reservation = db.query(models.Reservation).filter(
-        models.Reservation.saga_id == request.saga_id
-    ).first()
+    try:
+        return service.release_product(db, request)
 
-    if reservation is None:
+    except service.ReservationNotFoundError:
+        db.rollback()
         raise HTTPException(
             status_code=404,
             detail="Reservation not found"
         )
 
-    # Zakljucavanje proizvoda
-    product = (
-        db.query(models.Product)
-        .filter(models.Product.id == reservation.product_id)
-        .with_for_update()
-        .first()
-    )
-
-    if product is None:
+    except service.ProductNotFoundError:
+        db.rollback()
         raise HTTPException(
             status_code=404,
             detail="Product not found"
         )
 
-    # Zakljucavanje rezervacije i ponovo status proveravamo
-    reservation = (
-        db.query(models.Reservation)
-        .filter(models.Reservation.saga_id == request.saga_id)
-        .populate_existing()
-        .with_for_update()
-        .first()
-    )
-
-    if reservation.status == "RELEASED":
-        return {
-            "message": "Product already released",
-            "product_id": reservation.product_id
-        }
-
-    # Azuriramo
-    product.quantity += reservation.quantity
-
-    # Oznacavamo rezervaciju kao oslobodjenu
-    reservation.status = "RELEASED"
-
-    db.commit()
-    db.refresh(product)
-
-    return {
-        "message": "Product released",
-        "product_id": product.id,
-        "quantity": product.quantity
-    }
 
 @app.delete("/products/{product_id}")
 def delete_product(

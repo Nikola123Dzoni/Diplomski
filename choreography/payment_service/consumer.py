@@ -35,7 +35,6 @@ def process_message(ch, method, properties, body):
 
         print("Placanje uspesno:", result)
 
-
         # Objavljujemo novi dogadjaj
         publish_event(
             "PaymentCompleted",
@@ -48,16 +47,35 @@ def process_message(ch, method, properties, body):
                 "amount": event["amount"]
             }
         )
+
         print("PaymentCompleted objavljen!", flush=True)
 
+    except (
+        service.AccountNotFoundError,
+        service.InsufficientFundsError
+    ) as e:
+        db.rollback()
+
+        print("Placanje neuspesno:", e, flush=True)
+
+        publish_event(
+            "PaymentFailed",
+            {
+                "saga_id": event["saga_id"],
+                "order_id": event["order_id"],
+                "product_id": event["product_id"],
+                "account_id": event["account_id"],
+                "quantity": event["quantity"],
+                "amount": event["amount"],
+                "reason": str(e)
+            }
+        )
+
+        print("PaymentFailed objavljen!", flush=True)
 
     except Exception as e:
         db.rollback()
-        print("Greska pri placanju:", e)
-
-        # Za sada ne potvrdjujemo neuspesnu obradu.
-        # Kasnije razlikujemo poslovni neuspeh
-        # od privremene tehnicke greske.
+        print("Greska pri placanju:", e, flush=True)
         raise
 
     finally:

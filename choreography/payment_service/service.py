@@ -1,7 +1,19 @@
-from fastapi import HTTPException
+
 from sqlalchemy.orm import Session
 
 from . import models, schemas
+
+
+class AccountNotFoundError(Exception):
+    pass
+
+
+class InsufficientFundsError(Exception):
+    pass
+
+
+class PaymentAlreadyRefundedError(Exception):
+    pass
 
 
 def pay(db: Session, payment: schemas.PaymentCreate):
@@ -14,10 +26,7 @@ def pay(db: Session, payment: schemas.PaymentCreate):
     )
 
     if account is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Account not found"
-        )
+        raise AccountNotFoundError("Account not found")
 
     # Proveravamo da li je Saga vec izvrsila placanje
     existing_payment = db.query(models.Payment).filter(
@@ -26,18 +35,14 @@ def pay(db: Session, payment: schemas.PaymentCreate):
 
     if existing_payment:
         if existing_payment.status == "REFUNDED":
-            raise HTTPException(
-                status_code=409,
-                detail="Payment already refunded"
+            raise PaymentAlreadyRefundedError(
+                "Payment already refunded"
             )
 
         return existing_payment
 
     if account.balance < payment.amount:
-        raise HTTPException(
-            status_code=400,
-            detail="Insufficient funds"
-        )
+        raise InsufficientFundsError("Insufficient funds")
 
     # Skidamo novac
     account.balance -= payment.amount

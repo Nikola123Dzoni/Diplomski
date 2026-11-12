@@ -2,7 +2,12 @@
 import json
 import pika
 
-from .rabbitmq import setup_queue, RABBITMQ_HOST, QUEUE_NAME, publish_event
+from .rabbitmq import (
+    setup_queue,
+    RABBITMQ_HOST,
+    QUEUE_NAME,
+    publish_event
+)
 from .database import SessionLocal
 from . import service, schemas
 
@@ -10,46 +15,89 @@ from . import service, schemas
 def process_message(ch, method, properties, body):
     event = json.loads(body)
 
-    if event["event_type"] != "OrderCreated":
+    print("Inventory primio dogadjaj:", event, flush=True)
+
+    if event["event_type"] not in (
+        "OrderCreated",
+        "PaymentFailed"
+    ):
         ch.basic_ack(delivery_tag=method.delivery_tag)
         return
 
     db = SessionLocal()
 
     try:
-        request = schemas.ReserveRequest(
-            saga_id=event["saga_id"],
-            product_id=event["product_id"],
-            quantity=event["quantity"]
-        )
+        if event["event_type"] == "OrderCreated":
 
-        result = service.reserve_product(db, request)
+            request = schemas.ReserveRequest(
+                saga_id=event["saga_id"],
+                product_id=event["product_id"],
+                quantity=event["quantity"]
+            )
 
-        print("Rezervacija uspesna:", result)
+            result = service.reserve_product(db, request)
 
-        # Objavljujemo novi dogadjaj
+            print("Rezervacija uspesna:", result)
+
+            publish_event(
+                "InventoryReserved",
+                {
+                    "saga_id": event["saga_id"],
+                    "order_id": event["order_id"],
+                    "product_id": event["product_id"],
+                    "account_id": event["account_id"],
+                    "quantity": event["quantity"],
+                    "amount": event["amount"]
+                }
+            )
+
+            print("InventoryReserved poslat!", flush=True)
+
+        elif event["event_type"] == "PaymentFailed":
+
+            request = schemas.ReleaseRequest(
+                saga_id=event["saga_id"]
+            )
+
+            result = service.release_product(db, request)
+
+            print("Rezervacija oslobodjena:", result, flush=True)
+
+            publish_event(
+                "InventoryReleased",
+                {
+                    "saga_id": event["saga_id"],
+                    "order_id": event["order_id"],
+                    "product_id": event["product_id"]
+                }
+            )
+
+            print("InventoryReleased poslat!", flush=True)
+
+    except service.InsufficientStockError:
+        db.rollback()
+
+        print("Nema dovoljno proizvoda!", flush=True)
+
         publish_event(
-            "InventoryReserved",
+            "InventoryReservationFailed",
             {
                 "saga_id": event["saga_id"],
                 "order_id": event["order_id"],
-                "product_id": event["product_id"],
-                "account_id": event["account_id"],
-                "quantity": event["quantity"],
-                "amount": event["amount"]
+                "product_id": event["product_id"]
             }
         )
-        print("InventoryReserved poslat u RabbitMQ!", flush=True)
 
-    except Exception:
+        print("InventoryReservationFailed poslat!", flush=True)
+
+    except Exception as e:
         db.rollback()
+        print("Greska u Inventory Consumer-u:", e, flush=True)
         raise
 
     finally:
         db.close()
 
-    # Privremeno: kasnije ACK tek nakon
-    # pouzdanog objavljivanja InventoryReserved
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

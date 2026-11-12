@@ -31,6 +31,18 @@ def setup_queue():
         routing_key="PaymentCompleted"
     )
 
+    channel.queue_bind(
+        exchange=EXCHANGE_NAME,
+        queue=QUEUE_NAME,
+        routing_key="InventoryReservationFailed"
+    )
+
+    channel.queue_bind(
+        exchange=EXCHANGE_NAME,
+        queue=QUEUE_NAME,
+        routing_key="InventoryReleased"
+    )
+
     connection.close()
 
 
