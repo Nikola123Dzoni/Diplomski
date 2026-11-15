@@ -10,8 +10,8 @@ class OrderCreate(BaseModel):
 
 class OrderUpdate(BaseModel):
     id: int
+    saga_id: int
     status: str
-
 
 class OrderResponse(BaseModel):
     id: int
@@ -28,7 +28,4 @@ class OrderResponse(BaseModel):
 
 class CancelOrderRequest(BaseModel):
     order_id: int
-
-    model_config = {
-        "from_attributes": True
-    }
+    saga_id: int

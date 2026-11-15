@@ -22,6 +22,7 @@ def process_message(ch, method, properties, body):
             order = service.update_order_status(
                 db,
                 event["order_id"],
+                event["saga_id"],
                 "PAID"
             )
 
@@ -40,7 +41,8 @@ def process_message(ch, method, properties, body):
         try:
             order = service.cancel_order(
                 db,
-                event["order_id"]
+                event["order_id"],
+                event["saga_id"]
             )
 
             print("Order CANCELLED:", order.id)
@@ -58,7 +60,8 @@ def process_message(ch, method, properties, body):
         try:
             order = service.cancel_order(
                 db,
-                event["order_id"]
+                event["order_id"],
+                event["saga_id"]
             )
 
             print("Order CANCELLED:", order.id)

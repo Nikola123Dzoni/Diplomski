@@ -92,6 +92,7 @@ def update_order_status(
         return service.update_order_status(
             db,
             order_update.id,
+            order_update.saga_id,
             order_update.status
         )
 
@@ -117,7 +118,11 @@ def cancel_order(
     db: Session = Depends(get_db)
 ):
     try:
-        return service.cancel_order(db, request.order_id)
+        return service.cancel_order(
+            db,
+            request.order_id,
+            request.saga_id
+        )
 
     except service.OrderNotFoundError:
         db.rollback()

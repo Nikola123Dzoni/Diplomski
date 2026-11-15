@@ -12,10 +12,18 @@ class InvalidOrderStatusError(Exception):
     pass
 
 
-def update_order_status(db: Session, order_id: int, status: str):
+def update_order_status(
+    db: Session,
+    order_id: int,
+    saga_id: int,
+    status: str
+):
     order = (
         db.query(models.Order)
-        .filter(models.Order.id == order_id)
+        .filter(
+            models.Order.id == order_id,
+            models.Order.saga_id == saga_id
+        )
         .with_for_update()
         .first()
     )
@@ -45,10 +53,13 @@ def update_order_status(db: Session, order_id: int, status: str):
     return order
 
 
-def cancel_order(db: Session, order_id: int):
+def cancel_order(db: Session, order_id: int, saga_id: int):
     order = (
         db.query(models.Order)
-        .filter(models.Order.id == order_id)
+        .filter(
+            models.Order.id == order_id,
+            models.Order.saga_id == saga_id
+        )
         .with_for_update()
         .first()
     )
