@@ -23,52 +23,17 @@ def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db)
 ):
-    # Proveravamo da li je ova Saga vec kreirala order
-    existing_order = db.query(models.Order).filter(
-        models.Order.saga_id == order.saga_id
-    ).first()
+    new_order, created = service.create_order(db, order)
 
-    if existing_order:
-        return existing_order
-
-    # Kreiramo novi order
-    new_order = models.Order(
-        saga_id=order.saga_id,
-        product_id=order.product_id,
-        account_id=order.account_id,
-        quantity=order.quantity,
-        price=order.price,
-        status="PENDING"
-    )
-
-    db.add(new_order)
-
-    try:
-        db.commit()
-
-    except IntegrityError:
-        db.rollback()
-
-        existing_order = db.query(models.Order).filter(
-            models.Order.saga_id == order.saga_id
-        ).first()
-
-        if existing_order:
-            return existing_order
-
-        raise
-
-    db.refresh(new_order)
-
-    # Objavljujemo dogadjaj nakon kreiranja porudzbine
-    publish_event("OrderCreated", {
-        "saga_id": new_order.saga_id,
-        "order_id": new_order.id,
-        "product_id": new_order.product_id,
-        "account_id": new_order.account_id,
-        "quantity": new_order.quantity,
-        "amount": new_order.price * new_order.quantity
-    })
+    if created:
+        publish_event("OrderCreated", {
+            "saga_id": new_order.saga_id,
+            "order_id": new_order.id,
+            "product_id": new_order.product_id,
+            "account_id": new_order.account_id,
+            "quantity": new_order.quantity,
+            "amount": new_order.price * new_order.quantity
+        })
 
     return new_order
 
@@ -78,10 +43,7 @@ def create_order(
 def get_orders(
     db: Session = Depends(get_db)
 ):
-    orders = db.query(models.Order).all()
-    return orders
-
-
+    return service.get_orders(db)
 
 @app.put("/orders/status", response_model=schemas.OrderResponse)
 def update_order_status(
