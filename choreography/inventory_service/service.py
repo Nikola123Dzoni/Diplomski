@@ -19,6 +19,25 @@ class ReservationNotFoundError(Exception):
 class ReservationAlreadyReleasedError(Exception):
     pass
 
+def create_product(db: Session, product: schemas.ProductCreate):
+    new_product = models.Product(
+        name=product.name,
+        quantity=product.quantity
+    )
+
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
+
+    return new_product
+
+def get_products(db: Session):
+    return db.query(models.Product).all()
+
+def get_reservations(db: Session):
+    return db.query(models.Reservation).all()
+
+
 
 def reserve_product(db: Session, request: schemas.ReserveRequest):
 
@@ -128,3 +147,33 @@ def release_product(db: Session, request: schemas.ReleaseRequest):
         "product_id": product.id,
         "quantity": product.quantity
     }
+
+def delete_product(db: Session, product_id: int):
+    product = (
+        db.query(models.Product)
+        .filter(models.Product.id == product_id)
+        .first()
+    )
+
+    if product is None:
+        raise ProductNotFoundError("Product not found")
+
+    db.delete(product)
+    db.commit()
+
+    return product_id
+
+def delete_reservation(db: Session, saga_id: int):
+    reservation = (
+        db.query(models.Reservation)
+        .filter(models.Reservation.saga_id == saga_id)
+        .first()
+    )
+
+    if reservation is None:
+        raise ReservationNotFoundError("Reservation not found")
+
+    db.delete(reservation)
+    db.commit()
+
+    return saga_id

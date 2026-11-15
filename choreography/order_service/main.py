@@ -101,25 +101,3 @@ def cancel_order(
         )
 
 
-@app.delete("/test-data/order/{order_id}")
-def delete_test_order(
-    order_id: int,
-    db: Session = Depends(get_db)
-):
-    order = db.query(models.Order).filter(
-        models.Order.id == order_id
-    ).first()
-
-    if order is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Order not found"
-        )
-
-    db.delete(order)
-    db.commit()
-
-    return {
-        "message": "Test order deleted",
-        "order_id": order_id
-    }

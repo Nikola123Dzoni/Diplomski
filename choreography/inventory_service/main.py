@@ -20,25 +20,16 @@ def create_product(
     product: schemas.ProductCreate,
     db: Session = Depends(get_db)
 ):
-    new_product = models.Product(
-        name=product.name,
-        quantity=product.quantity
-    )
-
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-
-    return new_product
+    return service.create_product(db, product)
 
 
 @app.get("/products", response_model=list[schemas.ProductResponse])
 def get_products(db: Session = Depends(get_db)):
-    return db.query(models.Product).all()
+    return service.get_products(db)
 
 @app.get("/reservations", response_model=list[schemas.ReservationResponse])
 def get_reservations(db: Session = Depends(get_db)):
-    return db.query(models.Reservation).all()
+    return service.get_reservations(db)
 
 
 
@@ -100,69 +91,37 @@ def delete_product(
     product_id: int,
     db: Session = Depends(get_db)
 ):
-    product = db.query(models.Product).filter(
-        models.Product.id == product_id
-    ).first()
+    try:
+        deleted_id = service.delete_product(db, product_id)
 
-    if product is None:
+        return {
+            "message": "Product deleted",
+            "product_id": deleted_id
+        }
+
+    except service.ProductNotFoundError:
+        db.rollback()
         raise HTTPException(
             status_code=404,
             detail="Product not found"
         )
-
-    db.delete(product)
-    db.commit()
-
-    return {
-        "message": "Product deleted",
-        "product_id": product_id
-    }
 
 @app.delete("/reservations/{saga_id}")
 def delete_reservation(
     saga_id: int,
     db: Session = Depends(get_db)
 ):
-    reservation = db.query(models.Reservation).filter(
-        models.Reservation.saga_id == saga_id
-    ).first()
+    try:
+        deleted_saga_id = service.delete_reservation(db, saga_id)
 
-    if reservation is None:
+        return {
+            "message": "Reservation deleted",
+            "saga_id": deleted_saga_id
+        }
+
+    except service.ReservationNotFoundError:
+        db.rollback()
         raise HTTPException(
             status_code=404,
             detail="Reservation not found"
         )
-
-    db.delete(reservation)
-    db.commit()
-
-    return {
-        "message": "Reservation deleted",
-        "saga_id": saga_id
-    }
-
-@app.delete("/test-data/product/{product_id}")
-def delete_test_product_data(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    # Brisemo sve rezervacije koje pripadaju ovom proizvodu
-    db.query(models.Reservation).filter(
-        models.Reservation.product_id == product_id
-    ).delete(synchronize_session=False)
-
-    # Pronalazimo proizvod
-    product = db.query(models.Product).filter(
-        models.Product.id == product_id
-    ).first()
-
-    # Brisemo proizvod ako postoji
-    if product is not None:
-        db.delete(product)
-
-    db.commit()
-
-    return {
-        "message": "Test data deleted",
-        "product_id": product_id
-    }

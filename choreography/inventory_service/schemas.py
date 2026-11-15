@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel
 
 
@@ -25,6 +26,7 @@ class ReserveRequest(BaseModel):
 class ReleaseRequest(BaseModel):
     saga_id: int
 
+
 class ReservationResponse(BaseModel):
     id: int
     saga_id: int
@@ -32,5 +34,6 @@ class ReservationResponse(BaseModel):
     quantity: int
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
