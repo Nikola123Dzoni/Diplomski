@@ -11,6 +11,33 @@ from order_service import models
 from inventory_service.database import Base as InventoryBase
 from inventory_service import models as inventory_models
 
+from payment_service.database import Base as PaymentBase
+from payment_service import models as payment_models
+
+@pytest.fixture
+def payment_db():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+
+    PaymentBase.metadata.create_all(bind=engine)
+
+    TestingSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+        PaymentBase.metadata.drop_all(bind=engine)
+        engine.dispose()
 
 
 @pytest.fixture
