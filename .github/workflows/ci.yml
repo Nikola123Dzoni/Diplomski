@@ -24,5 +24,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run unit tests
+        working-directory: ./choreography
+        env:
+          PYTHONPATH: ${{ github.workspace }}/choreography
         run: |
-          python -m pytest choreography/tests/unit/ -v
+          python -m pytest tests/unit/ -v
